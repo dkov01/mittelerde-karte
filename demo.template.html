@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Auf Frodos Spuren · Mittelerde-Kartendemo v0.6</title>
+<style>
+ :root{font-family:system-ui,sans-serif;color-scheme:dark}
+ *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 55% 0,#415349 0,#1c2925 63%);color:#f6e8c7}
+ main{max-width:1540px;margin:0 auto;padding:clamp(8px,2.3vw,30px)}
+ .welcome{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+ .welcome strong{font:700 17px Georgia,serif;letter-spacing:.04em}.welcome span{font-size:12px;color:#c1d4c5}
+ .hint{color:#d2c4a8;font-size:12px;margin:12px 2px;line-height:1.5}
+ mittelerde-karte{display:block;--primary-text-color:#322719}
+</style>
+</head>
+<body>
+<main>
+ <header class="welcome"><strong>MITTELERDE · DIE REISE DER GEFÄHRTEN</strong><span>Lokale interaktive Vorschau · HACS-kompatible Home-Assistant-Karte</span></header>
+ <mittelerde-karte></mittelerde-karte>
+ <p class="hint">Menü rechts oben: Kilometer-Slider, genaue Eingabe, Personenauswahl, Reiseumfang und Kartenebenen. Die Testwerte bleiben in diesem Browser gespeichert. Der tatsächliche Karteneditor in Home Assistant bietet später alle registrierten Personen und ihre Distanzquellen zur Auswahl.</p>
+</main>
+<script>
+/* __INLINE_JOURNEY_DATA__ */
+/* __INLINE_COMPONENT__ */
+/* __INLINE_IMAGE__ */
+const STORE='mittelerde-demo-km-v5';
+const SETTINGS='mittelerde-demo-ansicht-v5';
+const defaults=[400,3210,5800];
+let values=defaults.slice(),settings={};
+try {
+ const old=JSON.parse(localStorage.getItem(STORE)||localStorage.getItem('mittelerde-demo-km-v4')||localStorage.getItem('mittelerde-demo-km-v3')||'null');
+ if(Array.isArray(old))values=defaults.map((v,i)=>Number.isFinite(Number(old[i]))?Math.max(0,Number(old[i])):v);
+ settings=JSON.parse(localStorage.getItem(SETTINGS)||'{}')||{};
+}catch(_error){}
+const card=document.querySelector('mittelerde-karte');
+const people=[
+ {person_entity:'person.demo_alina',entity:'sensor.demo_1',farbe:'#a04f32'},
+ {person_entity:'person.demo_ben',entity:'sensor.demo_2',farbe:'#387778'},
+ {person_entity:'person.demo_cora',entity:'sensor.demo_3',farbe:'#856ba0'}
+];
+card.setConfig({titel:'Auf Frodos Spuren',karte:INLINE_MAP_IMAGE,demo_mode:true,rueckreise:settings.rueckreise!==false,ebenen:settings.ebenen||{},personen:people});
+const identity=[['Alina'],['Ben'],['Cora']];
+const states={
+ 'person.demo_alina':{state:'home',attributes:{friendly_name:'Alina'}},
+ 'person.demo_ben':{state:'home',attributes:{friendly_name:'Ben'}},
+ 'person.demo_cora':{state:'home',attributes:{friendly_name:'Cora'}}
+};
+function sync(){
+ values.forEach((value,i)=>{states[`sensor.demo_${i+1}`]={state:String(value),attributes:{unit_of_measurement:'km'}};});
+ card.hass={states};
+}
+card.addEventListener('demo-distance-change',e=>{
+ values[e.detail.index]=e.detail.km;
+ try{localStorage.setItem(STORE,JSON.stringify(values));}catch(_error){}
+ sync();
+});
+function saveSettings(){
+ try{localStorage.setItem(SETTINGS,JSON.stringify({rueckreise:card.includeReturn,ebenen:card.visibleLayers}));}catch(_error){}
+}
+card.addEventListener('journey-mode-change',saveSettings);
+card.addEventListener('layer-visibility-change',saveSettings);
+sync();
+</script>
+</body>
+</html>
