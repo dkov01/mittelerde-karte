@@ -351,7 +351,10 @@ class MittelerdeKarte extends HTMLElement {
     // The correction is stored in a separate input_number helper, never written to Health Connect.
     const raw = this._hass?.states?.[person.entity];
     const base = toKilometers(raw, person);
-    const correction = person.korrektur_entity ?
+    // A value helper may be used directly as the source OR as a correction,
+    // but adding it to itself would double the distance.
+    const distinctCorrection = person.korrektur_entity && person.korrektur_entity !== person.entity;
+    const correction = distinctCorrection ?
       toKilometers(this._hass?.states?.[person.korrektur_entity], {unit:'km'}) : null;
     const demo = Number.isFinite(Number(person.demo_km)) ? Number(person.demo_km) : null;
     if (base===null && correction===null) return raw ? null : demo;
@@ -365,13 +368,14 @@ class MittelerdeKarte extends HTMLElement {
       this._editMessage.textContent='Bitte einen gültigen, nicht negativen Kilometerstand eingeben.';
       return;
     }
-    const helper=person.korrektur_entity || (person.entity?.startsWith('input_number.') ? person.entity : null);
+    const distinctCorrection = person.korrektur_entity && person.korrektur_entity !== person.entity;
+    const helper=distinctCorrection ? person.korrektur_entity : (person.entity?.startsWith('input_number.') ? person.entity : null);
     if(!helper || !this._hass?.callService) {
       this._editMessage.textContent='Kein beschreibbarer Home-Assistant-Zahlhelfer konfiguriert.';
       return;
     }
     let value=target;
-    if (person.korrektur_entity) {
+    if (distinctCorrection) {
       const base=toKilometers(this._hass?.states?.[person.entity], person) ?? 0;
       value=target-base-(Number(person.start_offset_km)||0);
     } else {
@@ -562,7 +566,15 @@ class MittelerdeKarteEditor extends HTMLElement {
       const details=document.createElement('div');details.hidden=!existing;group.append(details);
       const setField=(key,value)=>{
         const entry=(this._config.personen||[]).find(p=>p.person_entity===personEntity);if(!entry)return;
-        entry[key]=value;this._emit();
+        if(key==='korrektur_entity' && value && value===entry.entity)return;
+        entry[key]=value;
+        // Changing the base sensor to the former correction helper must not
+        // retain a duplicate correction in the saved card configuration.
+        if(key==='entity' && entry.korrektur_entity===value){
+          entry.korrektur_entity='';
+          this._emit();this._render();return;
+        }
+        this._emit();
       };
       checked.addEventListener('change',()=>{
         if(checked.checked){this._config.personen=[...(this._config.personen||[]),{person_entity:personEntity,entity:''}];}
@@ -574,9 +586,17 @@ class MittelerdeKarteEditor extends HTMLElement {
         const available=[['','– Kilometerquelle auswählen –'],...candidates.map(id=>[id,this._hass?.states?.[id]?.attributes?.friendly_name?`${this._hass.states[id].attributes.friendly_name} (${id})`:id])];
         if(existing.entity&&!candidates.includes(existing.entity))available.push([existing.entity,existing.entity]);
         details.append(select('Kumulierter Distanzsensor oder Kilometer-Helfer',available,existing.entity,v=>setField('entity',v)));
-        const corrections=[['','– Keine manuelle Korrektur –'],...numbers.map(id=>[id,id])];
-        if(existing.korrektur_entity&&!numbers.includes(existing.korrektur_entity))corrections.push([existing.korrektur_entity,existing.korrektur_entity]);
-        details.append(select('Korrektur-Helfer (optional)',corrections,existing.korrektur_entity,v=>setField('korrektur_entity',v)));
+        const validCorrections=numbers.filter(id=>id!==existing.entity);
+        const corrections=[['','– Keine manuelle Korrektur –'],...validCorrections.map(id=>[id,id])];
+        if(existing.korrektur_entity && existing.korrektur_entity!==existing.entity && !validCorrections.includes(existing.korrektur_entity))corrections.push([existing.korrektur_entity,existing.korrektur_entity]);
+        details.append(select('Korrektur-Helfer (optional)',corrections,existing.korrektur_entity===existing.entity?'':existing.korrektur_entity,v=>setField('korrektur_entity',v)));
+        if(existing.korrektur_entity && existing.korrektur_entity===existing.entity){
+          const warning=textEl('small','','Dieser Helfer ist doppelt zugeordnet. Er wird nur einmal gezählt.');
+          warning.style.color='#b46e28';details.append(warning);
+          const fix=textEl('button','','Doppelte Zuordnung entfernen');fix.type='button';fix.style.marginTop='5px';
+          fix.addEventListener('click',()=>{setField('korrektur_entity','');this._render();});
+          details.append(fix);
+        }
         if(!existing.entity)details.append(textEl('small','','Ohne Distanzquelle erscheint noch kein Pin.'));
       }
       root.append(group);
