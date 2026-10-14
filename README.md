@@ -1,4 +1,4 @@
-# Mittelerde-Reisekarte für Home Assistant — v0.6
+# Mittelerde-Reisekarte für Home Assistant — v0.6.1
 
 Interaktive Karte von Frodos Reise mit Personen-Pins, eigener Reisestrecke für jedes Haushaltsmitglied, Distanzsensoren, manueller Kilometerkorrektur und einer optionalen Rückreise zu den Grauen Anfurten.
 
@@ -38,7 +38,7 @@ personen:
     korrektur_entity: input_number.kilometer_korrektur
 ```
 
-Die Karte bildet dann `Basis + Korrektur` ab, ohne den Sensorwert zu überschreiben. **Wichtig:** Die Health-Connect-Tagesdistanz setzt sich täglich zurück und ist kein kumulierter Kilometerzähler. Die automatische, verlustfreie Langzeitaggregation bleibt ein separates Arbeitspaket.
+Die Karte bildet dann `Basis + Korrektur` ab, ohne den Sensorwert zu überschreiben. **Wichtig:** Bei einem `input_number.*` als direkter Kilometerquelle keinen zusätzlichen Korrektur-Helfer mit derselben Entität auswählen. Identische Entitäten werden höchstens einmal gezählt. **Wichtig:** Die Health-Connect-Tagesdistanz setzt sich täglich zurück und ist kein kumulierter Kilometerzähler. Die automatische, verlustfreie Langzeitaggregation bleibt ein separates Arbeitspaket.
 
 ## Bedienung
 
